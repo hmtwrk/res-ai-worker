@@ -1,21 +1,20 @@
-# Use a base image with Python
-FROM python:3.11-slim
+FROM runpod/pytorch:2.0.1-py3.10-cuda11.8.0-devel
 
-# Set working directory
 WORKDIR /app
 
-# Install system tools (ffmpeg is often needed for audio)
-RUN apt-get update && apt-get install -y \
-    git \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements and install
+# Install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
-# Copy your handler code
+# --- THE MAGIC STEP ---
+# Copy the builder script and RUN it. 
+# This bakes the 4GB file into the Docker Image itself.
+COPY builder.py .
+RUN python builder.py
+# ----------------------
+
 COPY handler.py .
 
-# Start the worker
-CMD [ "python", "-u", "handler.py" ]
+# Make sure your handler code knows to look in "/model" 
+# instead of trying to download it again!
+CMD [ "python", "-u", "/app/handler.py" ]
