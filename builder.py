@@ -1,11 +1,12 @@
 # builder.py
+import os
 from huggingface_hub import snapshot_download
 
-# Replace "hf_xxxxx" with your ACTUAL token you just copied
-HF_TOKEN = "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" 
+# It will look for an environment variable named HF_TOKEN
+token = os.getenv("HF_TOKEN")
 
 snapshot_download(
     repo_id="pillowcushion/res-ai",
     local_dir="/model",
-    token=HF_TOKEN  # <--- This grants permission to access your private repo
+    token=token
 )
