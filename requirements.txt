@@ -6,3 +6,4 @@ accelerate
 scipy
 huggingface_hub
 numpy
+safetensors
