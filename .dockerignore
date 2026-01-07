@@ -1,0 +1,10 @@
+# Ignore the model folder once it's created locally 
+# (You don't want to re-copy 4GB into the image context)
+model/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.git
+.gitignore
+.env
