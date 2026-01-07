@@ -17,11 +17,18 @@ def load_model():
     global pipe
     print("--- Loading Model... ---")
     
-    # Download the model securely
-    model_path = snapshot_download(repo_id=REPO_ID, token=HF_TOKEN)
+    # 1. Download the repo (which contains model.safetensors and config.json)
+    model_folder = snapshot_download(repo_id=REPO_ID, token=HF_TOKEN)
     
-    # Load into Memory
-    pipe = StableAudioPipeline.from_pretrained(model_path, torch_dtype=torch.float16)
+    # 2. Point to the specific file
+    checkpoint_path = f"{model_folder}/model.safetensors"
+    
+    # 3. Load using 'from_single_file'
+    pipe = StableAudioPipeline.from_single_file(
+        checkpoint_path, 
+        torch_dtype=torch.float16
+    )
+    
     pipe = pipe.to("cuda")
     print("--- Model Loaded! ---")
 
