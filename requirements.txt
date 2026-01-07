@@ -4,6 +4,8 @@ diffusers
 transformers
 accelerate
 scipy
-huggingface_hub
-numpy
 safetensors
+huggingface_hub
+torchsde
+sentencepiece
+protobuf
