@@ -3,74 +3,63 @@ import torch
 import base64
 import io
 import os
+import sys
 from diffusers import StableAudioPipeline
 from huggingface_hub import snapshot_download
 
-# 1. SETUP: Define your model info
-REPO_ID = "pillowcushion/res-ai"
-HF_TOKEN = os.environ.get("HF_TOKEN") # We will set this in RunPod settings later
+# --- 1. PROOF OF LIFE LOGGING ---
+# This prints immediately when the container starts
+print("--- 🚀 WORKER STARTING UP 🚀 ---", file=sys.stderr, flush=True)
 
-# 2. GLOBAL VARIABLES: Load model only once (Cold Start)
+REPO_ID = "pillowcushion/res-ai"
+HF_TOKEN = os.environ.get("HF_TOKEN")
+
 pipe = None
 
 def load_model():
     global pipe
-    print("--- Loading Model... ---")
+    print("--- 📥 Downloading Model... ---", file=sys.stderr, flush=True)
     
-    # 1. Download the repo (which contains model.safetensors and config.json)
+    # Download the entire repo (safetensors + config.json)
     model_folder = snapshot_download(repo_id=REPO_ID, token=HF_TOKEN)
     
-    # 2. Point to the specific file
-    checkpoint_path = f"{model_folder}/model.safetensors"
+    # Paths
+    checkpoint = f"{model_folder}/model.safetensors"
+    config_file = f"{model_folder}/config.json"
     
-    # 3. Load using 'from_single_file'
+    print(f"--- 🔍 Loading from: {checkpoint} ---", file=sys.stderr, flush=True)
+    
+    # Load with EXPLICIT config path
     pipe = StableAudioPipeline.from_single_file(
-        checkpoint_path, 
+        checkpoint, 
+        config=config_file,
         torch_dtype=torch.float16
     )
     
     pipe = pipe.to("cuda")
-    print("--- Model Loaded! ---")
+    print("--- ✅ Model Loaded Successfully! ---", file=sys.stderr, flush=True)
 
-# 3. HANDLER: This runs for every request
 def handler(job):
     global pipe
+    print("--- ⚡ Request Received ---", file=sys.stderr, flush=True)
     
-    # Load model if it's the first time running
     if pipe is None:
         load_model()
 
-    # Get the input from the API
     job_input = job["input"]
     prompt = job_input.get("prompt", "Cinematic drone")
     duration = job_input.get("duration", 10)
     steps = job_input.get("steps", 50)
 
-    # Generate Audio
-    generator = torch.Generator("cuda").manual_seed(42)
-    audio = pipe(
-        prompt, 
-        negative_prompt="Low quality, static, noise",
-        num_inference_steps=steps, 
-        audio_end_in_s=duration, 
-        num_waveforms_per_prompt=1, 
-        generator=generator
-    ).audios
+    audio = pipe(prompt, num_inference_steps=steps, audio_end_in_s=duration).audios
 
-    # Convert Audio to Base64 (to send back over the internet)
-    output = audio[0].T.float().cpu().numpy()
-    import scipy.io.wavfile as wav
-    import numpy as np
-    
-    # Save to buffer
     buffer = io.BytesIO()
-    wav.write(buffer, 44100, output)
+    import scipy.io.wavfile as wav
+    wav.write(buffer, 44100, audio[0].T.float().cpu().numpy())
     buffer.seek(0)
-    
-    # Encode
     audio_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
+    print("--- 📤 Sending Audio Back ---", file=sys.stderr, flush=True)
     return {"audio_base64": audio_base64}
 
-# 4. START: Connect to RunPod
 runpod.serverless.start({"handler": handler})
